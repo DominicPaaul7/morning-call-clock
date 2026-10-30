@@ -1,0 +1,39 @@
+# Starts the 06:00 IST morning call in DominicPaaul7/wyro-ops.
+#
+# It lives here because GitHub never runs scheduled workflows in that private
+# repo, while public repos' schedules fire. Four ticks, because a single
+# scheduled run can be late or dropped: the call waits for 06:00 itself, and
+# wyro-ops skips a tick once today's call happened (answered or declined).
+name: clock
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # 05:30 IST
+    - cron: "12 0 * * *"  # 05:42
+    - cron: "24 0 * * *"  # 05:54
+    - cron: "36 0 * * *"  # 06:06
+  workflow_dispatch:
+
+permissions:
+  actions: write # only to keep this schedule alive (below)
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Start the morning call
+        env:
+          GH_TOKEN: ${{ secrets.WYRO_OPS_DISPATCH }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "::error::WYRO_OPS_DISPATCH secret is not set"; exit 1; fi
+          gh workflow run morning-call.yml -R DominicPaaul7/wyro-ops --ref main -f now=false
+          echo "dispatched morning-call (now=false)"
+
+      # GitHub disables a public repo's schedules after 60 days without
+      # activity. Re-enabling the workflow counts as activity.
+      - name: Keep the schedule alive
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/clock.yml/enable"
